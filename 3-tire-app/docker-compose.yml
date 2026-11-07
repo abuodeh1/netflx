@@ -1,5 +1,6 @@
 services:
   postgres:
+    container_name: postgres
     image: postgres:16
     environment:
       POSTGRES_USER: app
@@ -18,14 +19,15 @@ services:
       - backend
 
   auth-service:
+    container_name: auth-service
     build: ./auth-service
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/authdb
       DB_USER: app
       DB_PASSWORD: app
       JWT_SECRET: ${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
-    ports:
-      - "8081:8081"
+    # ports:
+    #   - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,12 +36,13 @@ services:
       - backend
 
   todo-service:
+    container_name: todo-service
     build: ./todo-service
     environment:
       ConnectionStrings__Default: Host=postgres;Port=5432;Database=todosdb;Username=app;Password=app
       Jwt__Secret: ${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
-    ports:
-      - "8082:8082"
+    # ports:
+    #   - "8082:8082"
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,6 +51,7 @@ services:
       - backend
 
   frontend:
+    container_name: frontend
     build: ./frontend
     ports:
       - "3000:80"
