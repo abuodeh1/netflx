@@ -1,0 +1,321 @@
+services:
+  # ==================== ENTRY POINT / GATEWAY ====================
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      shell:
+        condition: service_started
+      mfe-auth:
+        condition: service_started
+      mfe-browse:
+        condition: service_started
+      studio:
+        condition: service_started
+      auth-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      media-service:
+        condition: service_healthy
+      watchlist-service:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - frontend-net
+      - backend-net
+    restart: unless-stopped
+
+  # ==================== MICRO-FRONTENDS ====================
+  shell:
+    build:
+      context: ./frontends/shell
+      dockerfile: Dockerfile
+    networks:
+      - frontend-net
+    restart: unless-stopped
+
+  mfe-auth:
+    build:
+      context: ./frontends/mfe-auth
+      dockerfile: Dockerfile
+    networks:
+      - frontend-net
+    restart: unless-stopped
+
+  mfe-browse:
+    build:
+      context: ./frontends/mfe-browse
+      dockerfile: Dockerfile
+    networks:
+      - frontend-net
+    restart: unless-stopped
+
+  studio:
+    build:
+      context: ./frontends/studio
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - frontend-net
+    restart: unless-stopped
+
+  # ==================== BACKEND MICROSERVICES ====================
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    environment:
+      - SERVER_PORT=8081
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://auth-db:5432/authdb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER:-netflix}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-netflix}
+      - JWT_SECRET=${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+      - db-net
+    restart: unless-stopped
+
+  catalog-service:
+    build:
+      context: ./services/catalog-service
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGO_URI=mongodb://catalog-db:27017/catalogdb
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-netflix}:${RABBITMQ_PASSWORD:-netflix}@rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+      - db-net
+    restart: unless-stopped
+
+  media-service:
+    build:
+      context: ./services/media-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgres://postgres:postgres@media-db:5432/mediadb
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-netflix}:${RABBITMQ_PASSWORD:-netflix}@rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_BUCKET=netflix-media
+    depends_on:
+      media-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+      - db-net
+    restart: unless-stopped
+
+  media-worker:
+    build:
+      context: ./services/media-service
+      dockerfile: Dockerfile
+    command: ["python", "manage.py", "runworker"] # Verify exact worker command in ./services/media-service
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@media-db:5432/mediadb
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-netflix}:${RABBITMQ_PASSWORD:-netflix}@rabbitmq:5672
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_BUCKET=netflix-media
+    depends_on:
+      media-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - db-net
+    restart: unless-stopped
+
+  watchlist-service:
+    build:
+      context: ./services/watchlist-service
+      dockerfile: Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=watchlist-db;Database=watchlistdb;Username=postgres;Password=postgres
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=${RABBITMQ_USER:-netflix}
+      - RabbitMQ__Password=${RABBITMQ_PASSWORD:-netflix}
+      - JWT_SECRET=${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
+    depends_on:
+      watchlist-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+      - db-net
+    restart: unless-stopped
+
+  # ==================== DATABASES, BROKER & OBJECT STORAGE ====================
+  auth-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=authdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d authdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-net
+    restart: unless-stopped
+
+  catalog-db:
+    image: mongo:7
+    volumes:
+      - catalog-db-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-net
+    restart: unless-stopped
+
+  media-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=mediadb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - media-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mediadb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-net
+    restart: unless-stopped
+
+  watchlist-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=watchlistdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - watchlist-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d watchlistdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-net
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-netflix}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-netflix}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - db-net
+    restart: unless-stopped
+
+  minio:
+    image: pgsty/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+      - db-net
+    restart: unless-stopped
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+  db-net:
+    driver: bridge
+
+volumes:
+  auth-db-data:
+  catalog-db-data:
+  media-db-data:
+  watchlist-db-data:
+  rabbitmq-data:
+  minio-data:

@@ -1,0 +1,27 @@
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+    internal: true
+    
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "80:80"
+    networks:
+      - frontend-net
+
+  mfe-auth:
+    build: ./frontends/mfe-auth
+    networks:
+      - frontend-net
+
+  mfe-browse:
+    build: ./frontends/mfe-browse
+    networks:
+      - frontend-net
+
+volumes:
+  db_data:

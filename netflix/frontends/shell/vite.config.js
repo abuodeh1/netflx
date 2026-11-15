@@ -19,7 +19,7 @@ export default defineConfig({
   build: { target: 'esnext' },
   // `npm run dev` while the rest of the stack runs in Docker (gateway on :8080)
   server: {
-    port: 5000,
+    port: 5100,
     proxy: {
       '/api': 'http://localhost:8080',
       '/mfe': 'http://localhost:8080',
