@@ -21,4 +21,4 @@ USER appuser
 EXPOSE 8000
 
 # Start Django on 0.0.0.0:8000 (matches `set $up media-service:8000;` in gateway)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py init_storage && exec python manage.py runserver 0.0.0.0:8000"]
