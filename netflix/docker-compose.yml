@@ -77,11 +77,11 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - SPRING_RABBITMQ_HOST=rabbitmq
-      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER:-netflix}
-      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-netflix}
-      - JWT_SECRET=${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     depends_on:
       auth-db:
         condition: service_healthy
@@ -105,8 +105,8 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - MONGO_URL=mongodb://catalog-db:27017/catalogdb
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-netflix}:${RABBITMQ_PASSWORD:-netflix}@rabbitmq:5672
-      - JWT_SECRET=${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       catalog-db:
         condition: service_healthy
@@ -133,11 +133,11 @@ services:
       - DB_NAME=mediadb
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-netflix}:${RABBITMQ_PASSWORD:-netflix}@rabbitmq:5672
-      - JWT_SECRET=${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET}
       - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET=netflix-media
     depends_on:
       media-db:
@@ -167,10 +167,10 @@ services:
       - DB_NAME=mediadb
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-netflix}:${RABBITMQ_PASSWORD:-netflix}@rabbitmq:5672
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
       - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET=netflix-media
     depends_on:
       media-db:
@@ -193,9 +193,9 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__Default=Host=watchlist-db;Database=watchlistdb;Username=postgres;Password=postgres
       - RabbitMQ__Host=rabbitmq
-      - RabbitMQ__User=${RABBITMQ_USER:-netflix}
-      - RabbitMQ__Password=${RABBITMQ_PASSWORD:-netflix}
-      - Jwt__Secret=${JWT_SECRET:-change-me-this-is-a-dev-secret-at-least-32-bytes}
+      - RabbitMQ__User=${RABBITMQ_USER}
+      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
+      - Jwt__Secret=${JWT_SECRET}
     depends_on:
       watchlist-db:
         condition: service_healthy
@@ -281,8 +281,8 @@ services:
     ports:
       - "15672:15672"
     environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-netflix}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-netflix}
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -300,8 +300,8 @@ services:
     ports:
       - "9001:9001"
     environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     volumes:
       - minio-data:/data
     healthcheck:
